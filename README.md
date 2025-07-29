@@ -94,8 +94,8 @@ styles/
 ├── nord.css           # Nord theme
 ├── dracula.css        # Dracula theme
 ├── onedark.css        # OneDark theme
-├── solarized.css      # Solarized Dark theme
-└── caelestia.css      # Caelestia cosmic theme
+└── solarized.css      # Solarized Dark theme
+
 ```
 
 ### Theme Switching
@@ -162,8 +162,6 @@ Each theme file is a complete, standalone CSS file with all styling rules. To cr
        color: #your-text-color;
        /* ... */
    }
-   ```
-
 All themes follow the same CSS structure, ensuring consistency while allowing complete color customization.
 
 ## Customization

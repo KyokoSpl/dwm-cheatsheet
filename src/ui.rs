@@ -1,8 +1,7 @@
 use crate::keybindings::{get_keybindings, Category, Keybinding};
 use gtk4::prelude::*;
 use gtk4::{
-    Align, Box, Label, ListBox, Orientation, Paned, ScrolledWindow,
-    SearchEntry, Separator, Widget,
+    Align, Box, Label, ListBox, Orientation, Paned, ScrolledWindow, SearchEntry, Separator, Widget,
 };
 use std::collections::HashMap;
 
@@ -21,7 +20,7 @@ pub fn build_main_widget() -> Widget {
 
     // Create content area first so we can reference it in search
     let content_area = build_content_area();
-    
+
     // Search bar with functionality
     let search_entry = SearchEntry::builder()
         .placeholder_text("Search keybindings...")
@@ -54,11 +53,11 @@ pub fn build_main_widget() -> Widget {
     // Sidebar with categories
     let sidebar = build_sidebar();
     paned.set_start_child(Some(&sidebar));
-    
+
     println!("Sidebar built and set as start child");
 
     paned.set_end_child(Some(&content_area));
-    
+
     println!("Content area built and set as end child");
 
     main_box.append(&paned);
@@ -84,7 +83,7 @@ fn build_header() -> Widget {
     title.add_css_class("title");
     title.set_halign(Align::Center);
 
-    let subtitle = Label::new(Some("Quick reference for your DWM configuration"));
+    let subtitle = Label::new(Some("Press Escape to quit"));
     subtitle.add_css_class("subtitle");
     subtitle.set_halign(Align::Center);
 
@@ -187,7 +186,7 @@ fn create_category_row(name: &str, _color: &str, is_selected: bool) -> Widget {
     color_box.set_width_request(4);
     color_box.set_height_request(20);
     color_box.add_css_class("color-indicator");
-    
+
     // Category name
     let label = Label::new(Some(name));
     label.set_halign(Align::Start);
@@ -253,7 +252,11 @@ fn build_content_area() -> Widget {
 
     for category in categories {
         if let Some(category_keybindings) = grouped_keybindings.get(&category) {
-            println!("Adding category: {:?} with {} keybindings", category, category_keybindings.len());
+            println!(
+                "Adding category: {:?} with {} keybindings",
+                category,
+                category_keybindings.len()
+            );
             let section = create_category_section(&category, category_keybindings);
             keybindings_box.append(&section);
         }
@@ -261,7 +264,6 @@ fn build_content_area() -> Widget {
 
     scrolled.set_child(Some(&keybindings_box));
     content_box.append(&scrolled);
-    
 
     content_box.upcast()
 }
@@ -273,8 +275,12 @@ fn create_category_section(category: &Category, keybindings: &[Keybinding]) -> W
         .build();
     section_box.add_css_class("category-section");
     section_box.set_margin_bottom(20);
-    
-    println!("Creating section for category: {:?} with {} keybindings", category, keybindings.len());
+
+    println!(
+        "Creating section for category: {:?} with {} keybindings",
+        category,
+        keybindings.len()
+    );
 
     // Category header
     let header_box = Box::builder()
@@ -330,7 +336,8 @@ fn create_keybinding_row(keybinding: &Keybinding) -> Widget {
     row_box.set_margin_bottom(8);
 
     // Add search data as widget name for filtering
-    let search_data = format!("{} {} {} {}", 
+    let search_data = format!(
+        "{} {} {} {}",
         keybinding.function.to_lowercase(),
         keybinding.description.to_lowercase(),
         keybinding.modifiers.join(" ").to_lowercase(),
@@ -389,11 +396,11 @@ fn create_keybinding_row(keybinding: &Keybinding) -> Widget {
 
 fn add_css_styling() {
     let provider = gtk4::CssProvider::new();
-    
+
     // Try to load from external CSS file first (from styles directory)
     let css_paths = ["styles/main.css", "styles.css"];
     let mut loaded = false;
-    
+
     for path in css_paths {
         if let Ok(css_file) = std::fs::read_to_string(path) {
             provider.load_from_data(&css_file);
@@ -402,7 +409,7 @@ fn add_css_styling() {
             break;
         }
     }
-    
+
     if !loaded {
         // Fallback to embedded CSS if no external file found
         println!("External CSS file not found, using embedded CSS");
@@ -418,7 +425,7 @@ fn add_css_styling() {
 
 fn filter_content(content_area: &Widget, search_text: &str) {
     println!("Filtering with search text: '{}'", search_text);
-    
+
     // Get the scrolled window from content area
     if let Some(content_box) = content_area.first_child() {
         if let Some(scrolled) = content_box.first_child() {
@@ -427,12 +434,12 @@ fn filter_content(content_area: &Widget, search_text: &str) {
                 let mut child = keybindings_box.first_child();
                 while let Some(section) = child {
                     let next_child = section.next_sibling();
-                    
+
                     // Check if this is a category section
                     if section.css_classes().contains(&"category-section".into()) {
                         filter_category_section(&section, search_text);
                     }
-                    
+
                     child = next_child;
                 }
             }
@@ -442,33 +449,39 @@ fn filter_content(content_area: &Widget, search_text: &str) {
 
 fn filter_category_section(section: &Widget, search_text: &str) {
     let mut visible_keybindings = 0;
-    
+
     // Find the keybindings container within the section
     let mut child = section.first_child();
     while let Some(current_child) = child {
-        if current_child.css_classes().contains(&"keybindings-container".into()) {
+        if current_child
+            .css_classes()
+            .contains(&"keybindings-container".into())
+        {
             // Iterate through keybinding rows
             let mut row = current_child.first_child();
             while let Some(keybinding_row) = row {
                 let next_row = keybinding_row.next_sibling();
-                
-                if keybinding_row.css_classes().contains(&"keybinding-row".into()) {
+
+                if keybinding_row
+                    .css_classes()
+                    .contains(&"keybinding-row".into())
+                {
                     let search_data = keybinding_row.widget_name().to_lowercase();
                     let should_show = search_text.is_empty() || search_data.contains(search_text);
-                    
+
                     keybinding_row.set_visible(should_show);
                     if should_show {
                         visible_keybindings += 1;
                     }
                 }
-                
+
                 row = next_row;
             }
             break;
         }
         child = current_child.next_sibling();
     }
-    
+
     // Hide the entire section if no keybindings are visible
     section.set_visible(visible_keybindings > 0);
 }
