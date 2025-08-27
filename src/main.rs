@@ -25,7 +25,7 @@ fn build_ui(app: &Application) {
     let window = ApplicationWindow::builder()
         .application(app)
         .title("DWM Keybinding Cheatsheet")
-        .default_width(1400)
+        .default_width(1100)
         .default_height(900)
         .build();
 

@@ -1,7 +1,7 @@
 use crate::keybindings::{get_keybindings, Category, Keybinding};
 use gtk4::prelude::*;
 use gtk4::{
-    Align, Box, Label, ListBox, Orientation, Paned, ScrolledWindow, SearchEntry, Separator, Widget,
+    Align, Box, Label, Orientation, Paned, ScrolledWindow, SearchEntry, Separator, Widget,
 };
 use std::collections::HashMap;
 
@@ -50,12 +50,6 @@ pub fn build_main_widget() -> Widget {
     paned.set_vexpand(true);
     paned.set_wide_handle(true);
 
-    // Sidebar with categories
-    let sidebar = build_sidebar();
-    paned.set_start_child(Some(&sidebar));
-
-    println!("Sidebar built and set as start child");
-
     paned.set_end_child(Some(&content_area));
 
     println!("Content area built and set as end child");
@@ -95,107 +89,6 @@ fn build_header() -> Widget {
     header_box.append(&separator);
 
     header_box.upcast()
-}
-
-fn build_sidebar() -> Widget {
-    let sidebar_box = Box::builder()
-        .orientation(Orientation::Vertical)
-        .spacing(0)
-        .build();
-    sidebar_box.add_css_class("sidebar");
-    sidebar_box.set_width_request(300);
-    sidebar_box.set_hexpand(false);
-    sidebar_box.set_vexpand(true);
-
-    let sidebar_title = Label::new(Some("Categories"));
-    sidebar_title.add_css_class("sidebar-title");
-    sidebar_title.set_margin_start(15);
-    sidebar_title.set_margin_end(15);
-    sidebar_title.set_margin_top(15);
-    sidebar_title.set_margin_bottom(10);
-    sidebar_title.set_halign(Align::Start);
-
-    sidebar_box.append(&sidebar_title);
-
-    let scrolled = ScrolledWindow::builder()
-        .hscrollbar_policy(gtk4::PolicyType::Never)
-        .vscrollbar_policy(gtk4::PolicyType::Automatic)
-        .hexpand(false)
-        .vexpand(true)
-        .build();
-
-    let listbox = ListBox::new();
-    listbox.add_css_class("category-list");
-
-    // Add "All" category
-    let all_row = create_category_row("All Categories", "#cdd6f4", true);
-    listbox.append(&all_row);
-
-    // Add separator
-    let separator = Separator::new(Orientation::Horizontal);
-    separator.set_margin_top(5);
-    separator.set_margin_bottom(5);
-    listbox.append(&separator);
-
-    // Add categories
-    let categories = [
-        Category::Media,
-        Category::Screenshot,
-        Category::Applications,
-        Category::WindowManagement,
-        Category::Layout,
-        Category::Gaps,
-        Category::Navigation,
-        Category::Tags,
-        Category::System,
-        Category::Borders,
-    ];
-
-    for category in categories {
-        let row = create_category_row(category.as_str(), category.color(), false);
-        listbox.append(&row);
-    }
-
-    scrolled.set_child(Some(&listbox));
-    sidebar_box.append(&scrolled);
-
-    sidebar_box.upcast()
-}
-
-fn create_category_row(name: &str, _color: &str, is_selected: bool) -> Widget {
-    let row_box = Box::builder()
-        .orientation(Orientation::Horizontal)
-        .spacing(10)
-        .build();
-    row_box.set_margin_start(15);
-    row_box.set_margin_end(15);
-    row_box.set_margin_top(8);
-    row_box.set_margin_bottom(8);
-
-    if is_selected {
-        row_box.add_css_class("category-row-selected");
-    } else {
-        row_box.add_css_class("category-row");
-    }
-
-    // Color indicator
-    let color_box = Box::builder()
-        .orientation(Orientation::Horizontal)
-        .spacing(0)
-        .build();
-    color_box.set_width_request(4);
-    color_box.set_height_request(20);
-    color_box.add_css_class("color-indicator");
-
-    // Category name
-    let label = Label::new(Some(name));
-    label.set_halign(Align::Start);
-    label.add_css_class("category-label");
-
-    row_box.append(&color_box);
-    row_box.append(&label);
-
-    row_box.upcast()
 }
 
 fn build_content_area() -> Widget {
