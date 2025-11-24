@@ -1,380 +1,350 @@
 use crate::keybindings::{get_keybindings, Category, Keybinding};
-use gtk4::prelude::*;
-use gtk4::{
-    Align, Box, Label, Orientation, Paned, ScrolledWindow, SearchEntry, Separator, Widget,
+use eframe::egui;
+use egui::{
+    Color32, Frame, Margin, RichText, Rounding, ScrollArea, Stroke, Ui,
+    Vec2,
 };
 use std::collections::HashMap;
 
-pub fn build_main_widget() -> Widget {
-    let main_box = Box::builder()
-        .orientation(Orientation::Vertical)
-        .spacing(0)
-        .build();
-    main_box.add_css_class("main-container");
-    main_box.set_hexpand(true);
-    main_box.set_vexpand(true);
+// Material 3 Dark Theme Colors
+struct MaterialColors;
 
-    // Header
-    let header = build_header();
-    main_box.append(&header);
-
-    // Create content area first so we can reference it in search
-    let content_area = build_content_area();
-
-    // Search bar with functionality
-    let search_entry = SearchEntry::builder()
-        .placeholder_text("Search keybindings...")
-        .margin_start(20)
-        .margin_end(20)
-        .margin_top(10)
-        .margin_bottom(10)
-        .build();
-
-    // Connect search functionality
-    let content_area_clone = content_area.clone();
-    search_entry.connect_search_changed(move |entry| {
-        let search_text = entry.text().to_string().to_lowercase();
-        filter_content(&content_area_clone, &search_text);
-    });
-
-    main_box.append(&search_entry);
-
-    // Content area with sidebar and main content
-    let paned = Paned::new(Orientation::Horizontal);
-    paned.set_shrink_start_child(false);
-    paned.set_shrink_end_child(true);
-    paned.set_position(300);
-    paned.set_resize_start_child(false);
-    paned.set_resize_end_child(true);
-    paned.set_hexpand(true);
-    paned.set_vexpand(true);
-    paned.set_wide_handle(true);
-
-    paned.set_end_child(Some(&content_area));
-
-    println!("Content area built and set as end child");
-
-    main_box.append(&paned);
-
-    // Add CSS styling
-    add_css_styling();
-
-    main_box.upcast()
+impl MaterialColors {
+    const SURFACE: Color32 = Color32::from_rgb(20, 18, 24);
+    const SURFACE_CONTAINER: Color32 = Color32::from_rgb(33, 31, 38);
+    const SURFACE_CONTAINER_HIGH: Color32 = Color32::from_rgb(43, 41, 48);
+    const ON_SURFACE: Color32 = Color32::from_rgb(230, 224, 233);
+    const ON_SURFACE_VARIANT: Color32 = Color32::from_rgb(202, 196, 208);
+    const OUTLINE: Color32 = Color32::from_rgb(147, 143, 153);
+    const OUTLINE_VARIANT: Color32 = Color32::from_rgb(73, 69, 79);
+    const PRIMARY: Color32 = Color32::from_rgb(208, 188, 255);
+    // const ON_PRIMARY: Color32 = Color32::from_rgb(56, 30, 114);
+    // const PRIMARY_CONTAINER: Color32 = Color32::from_rgb(79, 55, 139);
+    // const ON_PRIMARY_CONTAINER: Color32 = Color32::from_rgb(234, 221, 255);
+    // const SECONDARY_CONTAINER: Color32 = Color32::from_rgb(74, 68, 88);
+    // const ON_SECONDARY_CONTAINER: Color32 = Color32::from_rgb(232, 222, 248);
+    // const TERTIARY_CONTAINER: Color32 = Color32::from_rgb(99, 59, 72);
+    // const ON_TERTIARY_CONTAINER: Color32 = Color32::from_rgb(255, 216, 228);
 }
 
-fn build_header() -> Widget {
-    let header_box = Box::builder()
-        .orientation(Orientation::Vertical)
-        .spacing(5)
-        .build();
-    header_box.add_css_class("header");
-    header_box.set_margin_start(20);
-    header_box.set_margin_end(20);
-    header_box.set_margin_top(20);
-    header_box.set_margin_bottom(10);
-
-    let title = Label::new(Some("DWM Keybinding Cheatsheet"));
-    title.add_css_class("title");
-    title.set_halign(Align::Center);
-
-    let subtitle = Label::new(Some("Press Escape to quit"));
-    subtitle.add_css_class("subtitle");
-    subtitle.set_halign(Align::Center);
-
-    header_box.append(&title);
-    header_box.append(&subtitle);
-
-    let separator = Separator::new(Orientation::Horizontal);
-    separator.set_margin_top(10);
-    header_box.append(&separator);
-
-    header_box.upcast()
+pub struct CheatsheetApp {
+    keybindings: HashMap<Category, Vec<Keybinding>>,
+    search_text: String,
+    filtered_keybindings: HashMap<Category, Vec<Keybinding>>,
 }
 
-fn build_content_area() -> Widget {
-    let content_box = Box::builder()
-        .orientation(Orientation::Vertical)
-        .spacing(0)
-        .build();
-    content_box.add_css_class("content-area");
-    content_box.set_hexpand(true);
-    content_box.set_vexpand(true);
+impl CheatsheetApp {
+    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        // Customize fonts
+        let fonts = egui::FontDefinitions::default();
+        // You could load custom fonts here (e.g. Roboto)
+        // For now we stick to default but adjust sizes
+        cc.egui_ctx.set_fonts(fonts);
 
-    let scrolled = ScrolledWindow::builder()
-        .hscrollbar_policy(gtk4::PolicyType::Never)
-        .vscrollbar_policy(gtk4::PolicyType::Automatic)
-        .hexpand(true)
-        .vexpand(true)
-        .build();
+        // Configure style
+        let mut style = (*cc.egui_ctx.style()).clone();
+        style.visuals.dark_mode = true;
+        style.visuals.window_fill = MaterialColors::SURFACE;
+        style.visuals.panel_fill = MaterialColors::SURFACE;
+        style.visuals.widgets.noninteractive.bg_fill = MaterialColors::SURFACE;
+        style.spacing.item_spacing = Vec2::new(8.0, 8.0);
+        style.spacing.window_margin = Margin::same(0.0);
+        cc.egui_ctx.set_style(style);
 
-    let keybindings_box = Box::builder()
-        .orientation(Orientation::Vertical)
-        .spacing(15)
-        .build();
-    keybindings_box.set_margin_start(20);
-    keybindings_box.set_margin_end(20);
-    keybindings_box.set_margin_top(20);
-    keybindings_box.set_margin_bottom(20);
-    keybindings_box.set_vexpand(true);
+        let keybindings_vec = get_keybindings();
+        let mut keybindings: HashMap<Category, Vec<Keybinding>> = HashMap::new();
 
-    // Group keybindings by category
-    let keybindings = get_keybindings();
-    println!("Total keybindings loaded: {}", keybindings.len());
-    let mut grouped_keybindings: HashMap<Category, Vec<Keybinding>> = HashMap::new();
+        for keybinding in keybindings_vec {
+            keybindings
+                .entry(keybinding.category.clone())
+                .or_default()
+                .push(keybinding);
+        }
 
-    for keybinding in keybindings {
-        grouped_keybindings
-            .entry(keybinding.category.clone())
-            .or_default()
-            .push(keybinding);
+        let filtered_keybindings = keybindings.clone();
+
+        Self {
+            keybindings,
+            search_text: String::new(),
+            filtered_keybindings,
+        }
     }
 
-    // Create sections for each category
-    let categories = [
-        Category::Media,
-        Category::Screenshot,
-        Category::Applications,
-        Category::WindowManagement,
-        Category::Navigation,
-        Category::Layout,
-        Category::Gaps,
-        Category::Tags,
-        Category::System,
-        Category::Borders,
-    ];
+    fn update_filter(&mut self) {
+        self.filtered_keybindings.clear();
 
-    for category in categories {
-        if let Some(category_keybindings) = grouped_keybindings.get(&category) {
-            println!(
-                "Adding category: {:?} with {} keybindings",
-                category,
-                category_keybindings.len()
+        if self.search_text.is_empty() {
+            self.filtered_keybindings = self.keybindings.clone();
+        } else {
+            let search_lower = self.search_text.to_lowercase();
+
+            for (category, keybindings) in &self.keybindings {
+                let filtered: Vec<Keybinding> = keybindings
+                    .iter()
+                    .filter(|kb| {
+                        kb.function.to_lowercase().contains(&search_lower)
+                            || kb.description.to_lowercase().contains(&search_lower)
+                            || kb.modifiers.join(" ").to_lowercase().contains(&search_lower)
+                            || kb.key.to_lowercase().contains(&search_lower)
+                    })
+                    .cloned()
+                    .collect();
+
+                if !filtered.is_empty() {
+                    self.filtered_keybindings.insert(category.clone(), filtered);
+                }
+            }
+        }
+    }
+
+    fn get_category_color(&self, category: &Category) -> Color32 {
+        match category {
+            Category::Media => Color32::from_rgb(243, 139, 168), // Red
+            Category::Screenshot => Color32::from_rgb(250, 179, 135), // Orange
+            Category::Applications => Color32::from_rgb(249, 226, 175), // Yellow
+            Category::WindowManagement => Color32::from_rgb(166, 227, 161), // Green
+            Category::Layout => Color32::from_rgb(148, 226, 213), // Teal
+            Category::Gaps => Color32::from_rgb(137, 180, 250), // Blue
+            Category::Navigation => Color32::from_rgb(203, 166, 247), // Purple
+            Category::Tags => Color32::from_rgb(245, 194, 231), // Pink
+            Category::System => Color32::from_rgb(235, 160, 172), // Maroon
+            Category::Borders => Color32::from_rgb(180, 190, 254), // Lavender
+        }
+    }
+}
+
+impl eframe::App for CheatsheetApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Handle escape key
+        if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+            std::process::exit(0);
+        }
+
+        egui::CentralPanel::default().show(ctx, |ui| {
+            let available_width = ui.available_width();
+            
+            // --- Header Section ---
+            ui.add_space(24.0);
+            ui.vertical_centered(|ui| {
+                ui.label(
+                    RichText::new("DWM Keybinding Cheatsheet")
+                        .size(32.0)
+                        .color(MaterialColors::ON_SURFACE)
+                        .strong(),
+                );
+                ui.add_space(8.0);
+                ui.label(
+                    RichText::new("Press Escape to quit")
+                        .size(14.0)
+                        .color(MaterialColors::ON_SURFACE_VARIANT),
+                );
+            });
+            ui.add_space(24.0);
+
+            // --- Search Bar ---
+            let search_bar_width = (available_width * 0.6).clamp(300.0, 600.0);
+            ui.vertical_centered(|ui| {
+                Frame::none()
+                    .fill(MaterialColors::SURFACE_CONTAINER_HIGH)
+                    .rounding(Rounding::same(24.0))
+                    .inner_margin(Margin::symmetric(16.0, 12.0))
+                    .stroke(Stroke::new(1.0, MaterialColors::OUTLINE_VARIANT))
+                    .show(ui, |ui| {
+                        ui.set_width(search_bar_width);
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("🔍").size(16.0).color(MaterialColors::ON_SURFACE_VARIANT));
+                            ui.add_space(8.0);
+                            let text_edit = egui::TextEdit::singleline(&mut self.search_text)
+                                .frame(false)
+                                .hint_text(RichText::new("Search keybindings...").color(MaterialColors::ON_SURFACE_VARIANT))
+                                .text_color(MaterialColors::ON_SURFACE)
+                                .desired_width(f32::INFINITY);
+                            
+                            let response = ui.add(text_edit);
+                            if response.changed() {
+                                self.update_filter();
+                            }
+                            response.request_focus();
+                        });
+                    });
+            });
+            ui.add_space(32.0);
+
+            // --- Content Grid ---
+            ScrollArea::vertical()
+                .auto_shrink([false; 2])
+                .show(ui, |ui| {
+                    let width = ui.available_width();
+                    // Responsive columns
+                    let num_columns = if width > 1400.0 {
+                        3
+                    } else if width > 900.0 {
+                        2
+                    } else {
+                        1
+                    };
+                    
+                    let column_width = (width - (num_columns as f32 - 1.0) * 16.0) / num_columns as f32;
+                    
+                    // Distribute categories into columns
+                    let categories = [
+                        Category::Media,
+                        Category::Screenshot,
+                        Category::Applications,
+                        Category::WindowManagement,
+                        Category::Navigation,
+                        Category::Layout,
+                        Category::Gaps,
+                        Category::Tags,
+                        Category::System,
+                        Category::Borders,
+                    ];
+
+                    let mut columns: Vec<Vec<&Category>> = vec![Vec::new(); num_columns];
+                    for (i, category) in categories.iter().enumerate() {
+                        if self.filtered_keybindings.contains_key(category) {
+                            columns[i % num_columns].push(category);
+                        }
+                    }
+
+                    ui.horizontal_top(|ui| {
+                        for col_idx in 0..num_columns {
+                            ui.vertical(|ui| {
+                                ui.set_width(column_width);
+                                for category in &columns[col_idx] {
+                                    if let Some(keybindings) = self.filtered_keybindings.get(category) {
+                                        self.render_category_card(ui, category, keybindings);
+                                        ui.add_space(16.0);
+                                    }
+                                }
+                            });
+                            
+                            if col_idx < num_columns - 1 {
+                                ui.add_space(16.0);
+                            }
+                        }
+                    });
+                    
+                    ui.add_space(32.0);
+                });
+        });
+    }
+}
+
+impl CheatsheetApp {
+    fn render_category_card(&self, ui: &mut Ui, category: &Category, keybindings: &[Keybinding]) {
+        let accent_color = self.get_category_color(category);
+        
+        Frame::none()
+            .fill(MaterialColors::SURFACE_CONTAINER)
+            .rounding(Rounding::same(16.0))
+            .stroke(Stroke::new(1.0, MaterialColors::OUTLINE_VARIANT))
+            .inner_margin(Margin::same(0.0))
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                
+                // Card Header
+                Frame::none()
+                    .fill(accent_color.gamma_multiply(0.15)) // Tinted background
+                    .rounding(Rounding {
+                        nw: 16.0,
+                        ne: 16.0,
+                        sw: 0.0,
+                        se: 0.0,
+                    })
+                    .inner_margin(Margin::symmetric(20.0, 16.0))
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            // Colored pill indicator
+                            let (rect, _) = ui.allocate_exact_size(Vec2::new(4.0, 20.0), egui::Sense::hover());
+                            ui.painter().rect_filled(rect, 2.0, accent_color);
+                            
+                            ui.add_space(12.0);
+                            ui.label(
+                                RichText::new(category.as_str())
+                                    .size(18.0)
+                                    .strong()
+                                    .color(MaterialColors::ON_SURFACE),
+                            );
+                        });
+                    });
+
+                // Card Content
+                ui.allocate_ui(Vec2::new(ui.available_width(), 0.0), |ui| {
+                    let mut style = (**ui.style()).clone();
+                    style.spacing.item_spacing = Vec2::new(0.0, 0.0); // Manual spacing
+                    ui.set_style(style);
+                    
+                    Frame::none()
+                        .inner_margin(Margin::symmetric(20.0, 16.0))
+                        .show(ui, |ui| {
+                            for (i, keybinding) in keybindings.iter().enumerate() {
+                                if i > 0 {
+                                    ui.add_space(16.0);
+                                    // Divider
+                                    let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 1.0), egui::Sense::hover());
+                                    ui.painter().rect_filled(rect, 0.0, MaterialColors::OUTLINE_VARIANT.gamma_multiply(0.3));
+                                    ui.add_space(16.0);
+                                }
+                                self.render_keybinding_row(ui, keybinding, accent_color);
+                            }
+                        });
+                });
+            });
+    }
+
+    fn render_keybinding_row(&self, ui: &mut Ui, keybinding: &Keybinding, accent_color: Color32) {
+        ui.vertical(|ui| {
+            // Top row: Keys and Function
+            ui.horizontal(|ui| {
+                // Keys
+                ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing = Vec2::new(4.0, 4.0);
+                    for (i, modifier) in keybinding.modifiers.iter().enumerate() {
+                        self.render_key_chip(ui, modifier, accent_color);
+                        if i < keybinding.modifiers.len() - 1 || !keybinding.key.is_empty() {
+                            ui.label(RichText::new("+").size(12.0).color(MaterialColors::OUTLINE));
+                        }
+                    }
+                    if !keybinding.key.is_empty() {
+                        self.render_key_chip(ui, &keybinding.key, accent_color);
+                    }
+                });
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.label(
+                        RichText::new(&keybinding.function)
+                            .size(14.0)
+                            .strong()
+                            .color(MaterialColors::PRIMARY),
+                    );
+                });
+            });
+            
+            ui.add_space(4.0);
+            
+            // Bottom row: Description
+            ui.label(
+                RichText::new(&keybinding.description)
+                    .size(13.0)
+                    .color(MaterialColors::ON_SURFACE_VARIANT),
             );
-            let section = create_category_section(&category, category_keybindings);
-            keybindings_box.append(&section);
-        }
+        });
     }
 
-    scrolled.set_child(Some(&keybindings_box));
-    content_box.append(&scrolled);
-
-    content_box.upcast()
-}
-
-fn create_category_section(category: &Category, keybindings: &[Keybinding]) -> Widget {
-    let section_box = Box::builder()
-        .orientation(Orientation::Vertical)
-        .spacing(10)
-        .build();
-    section_box.add_css_class("category-section");
-    section_box.set_margin_bottom(20);
-
-    println!(
-        "Creating section for category: {:?} with {} keybindings",
-        category,
-        keybindings.len()
-    );
-
-    // Category header
-    let header_box = Box::builder()
-        .orientation(Orientation::Horizontal)
-        .spacing(10)
-        .build();
-    header_box.add_css_class("category-header");
-
-    let color_indicator = Box::builder()
-        .orientation(Orientation::Horizontal)
-        .spacing(0)
-        .build();
-    color_indicator.set_width_request(4);
-    color_indicator.set_height_request(24);
-    color_indicator.add_css_class("category-color");
-
-    let title = Label::new(Some(category.as_str()));
-    title.add_css_class("category-title");
-    title.set_halign(Align::Start);
-
-    header_box.append(&color_indicator);
-    header_box.append(&title);
-
-    section_box.append(&header_box);
-
-    // Keybindings grid
-    let keybindings_box = Box::builder()
-        .orientation(Orientation::Vertical)
-        .spacing(5)
-        .build();
-    keybindings_box.add_css_class("keybindings-container");
-
-    for keybinding in keybindings {
-        let keybinding_row = create_keybinding_row(keybinding);
-        keybindings_box.append(&keybinding_row);
-        println!("Added keybinding: {}", keybinding.function);
+    fn render_key_chip(&self, ui: &mut Ui, text: &str, _accent_color: Color32) {
+        Frame::none()
+            .fill(MaterialColors::SURFACE_CONTAINER_HIGH)
+            .stroke(Stroke::new(1.0, MaterialColors::OUTLINE_VARIANT))
+            .rounding(Rounding::same(6.0))
+            .inner_margin(Margin::symmetric(8.0, 4.0))
+            .show(ui, |ui| {
+                ui.label(
+                    RichText::new(text)
+                        .size(12.0)
+                        .family(egui::FontFamily::Monospace)
+                        .color(MaterialColors::ON_SURFACE),
+                );
+            });
     }
-
-    section_box.append(&keybindings_box);
-
-    section_box.upcast()
-}
-
-fn create_keybinding_row(keybinding: &Keybinding) -> Widget {
-    let row_box = Box::builder()
-        .orientation(Orientation::Horizontal)
-        .spacing(15)
-        .build();
-    row_box.add_css_class("keybinding-row");
-    row_box.set_margin_start(10);
-    row_box.set_margin_end(10);
-    row_box.set_margin_top(8);
-    row_box.set_margin_bottom(8);
-
-    // Add search data as widget name for filtering
-    let search_data = format!(
-        "{} {} {} {}",
-        keybinding.function.to_lowercase(),
-        keybinding.description.to_lowercase(),
-        keybinding.modifiers.join(" ").to_lowercase(),
-        keybinding.key.to_lowercase()
-    );
-    row_box.set_widget_name(&search_data);
-
-    // Keybinding display
-    let key_box = Box::builder()
-        .orientation(Orientation::Horizontal)
-        .spacing(5)
-        .build();
-    key_box.add_css_class("key-combination");
-    key_box.set_halign(Align::Start);
-    key_box.set_width_request(350);
-
-    // Add modifier keys
-    for modifier in &keybinding.modifiers {
-        let key_label = Label::new(Some(modifier));
-        key_label.add_css_class("key");
-        key_box.append(&key_label);
-
-        if modifier != keybinding.modifiers.last().unwrap() || !keybinding.key.is_empty() {
-            let plus = Label::new(Some("+"));
-            plus.add_css_class("key-separator");
-            key_box.append(&plus);
-        }
-    }
-
-    // Add main key
-    if !keybinding.key.is_empty() {
-        let main_key = Label::new(Some(&keybinding.key));
-        main_key.add_css_class("key");
-        key_box.append(&main_key);
-    }
-
-    // Function name
-    let function_label = Label::new(Some(&keybinding.function));
-    function_label.add_css_class("function-name");
-    function_label.set_halign(Align::Start);
-    function_label.set_width_request(250);
-
-    // Description
-    let description_label = Label::new(Some(&keybinding.description));
-    description_label.add_css_class("description");
-    description_label.set_halign(Align::Start);
-    description_label.set_ellipsize(gtk4::pango::EllipsizeMode::End);
-    description_label.set_hexpand(true);
-
-    row_box.append(&key_box);
-    row_box.append(&function_label);
-    row_box.append(&description_label);
-
-    row_box.upcast()
-}
-
-fn add_css_styling() {
-    let provider = gtk4::CssProvider::new();
-
-    // Try to load from external CSS file first (from styles directory)
-    let css_paths = ["styles/main.css", "styles.css"];
-    let mut loaded = false;
-
-    for path in css_paths {
-        if let Ok(css_file) = std::fs::read_to_string(path) {
-            provider.load_from_data(&css_file);
-            println!("Loaded CSS from external file: {}", path);
-            loaded = true;
-            break;
-        }
-    }
-
-    if !loaded {
-        // Fallback to embedded CSS if no external file found
-        println!("External CSS file not found, using embedded CSS");
-        provider.load_from_data(include_str!("../styles/main.css"));
-    }
-
-    gtk4::style_context_add_provider_for_display(
-        &gtk4::gdk::Display::default().expect("Could not connect to a display."),
-        &provider,
-        gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
-    );
-}
-
-fn filter_content(content_area: &Widget, search_text: &str) {
-    println!("Filtering with search text: '{}'", search_text);
-
-    // Get the scrolled window from content area
-    if let Some(content_box) = content_area.first_child() {
-        if let Some(scrolled) = content_box.first_child() {
-            if let Some(keybindings_box) = scrolled.first_child() {
-                // Iterate through all category sections
-                let mut child = keybindings_box.first_child();
-                while let Some(section) = child {
-                    let next_child = section.next_sibling();
-
-                    // Check if this is a category section
-                    if section.css_classes().contains(&"category-section".into()) {
-                        filter_category_section(&section, search_text);
-                    }
-
-                    child = next_child;
-                }
-            }
-        }
-    }
-}
-
-fn filter_category_section(section: &Widget, search_text: &str) {
-    let mut visible_keybindings = 0;
-
-    // Find the keybindings container within the section
-    let mut child = section.first_child();
-    while let Some(current_child) = child {
-        if current_child
-            .css_classes()
-            .contains(&"keybindings-container".into())
-        {
-            // Iterate through keybinding rows
-            let mut row = current_child.first_child();
-            while let Some(keybinding_row) = row {
-                let next_row = keybinding_row.next_sibling();
-
-                if keybinding_row
-                    .css_classes()
-                    .contains(&"keybinding-row".into())
-                {
-                    let search_data = keybinding_row.widget_name().to_lowercase();
-                    let should_show = search_text.is_empty() || search_data.contains(search_text);
-
-                    keybinding_row.set_visible(should_show);
-                    if should_show {
-                        visible_keybindings += 1;
-                    }
-                }
-
-                row = next_row;
-            }
-            break;
-        }
-        child = current_child.next_sibling();
-    }
-
-    // Hide the entire section if no keybindings are visible
-    section.set_visible(visible_keybindings > 0);
 }
